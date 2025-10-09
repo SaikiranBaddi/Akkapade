@@ -1,0 +1,17 @@
+{
+  "name": "",
+  "phone": "",
+  "complaint": "help",
+  "text": "help",
+  "location": {
+    "latitude": 13.3431296,
+    "longitude": 74.7700224,
+    "accuracy": 4181.608842765012
+  },
+  "files": {
+    "audio": null,
+    "video": "https://res.cloudinary.com/dptqmtpoq/video/upload/v1759947092/Akka_pade_reports/t2njtt2dftb2drqonviz.webm"
+  },
+  "mode": "video",
+  "submittedAt": "2025-10-08T18:11:33.185Z"
+}

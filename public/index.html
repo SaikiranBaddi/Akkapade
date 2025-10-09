@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ರಕ್ಷಣ ರೇಖೆ - Emergency Safety Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+Kannada:wght@700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', 'Noto Sans Kannada', sans-serif; 
+            /* Soft blue gradient background */
+            background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%); 
+            min-height: 100vh;
+        }
+        .kannada { font-family: 'Noto Sans Kannada', 'Inter', sans-serif; }
+        .card { 
+            border-radius: 1.5rem; 
+            box-shadow: 0 10px 30px rgba(10, 40, 80, 0.1), 0 4px 10px rgba(10, 40, 80, 0.05);
+            border: 1px solid #f0f4f8; 
+            background: rgba(255, 255, 255, 0.98);
+        }
+        .btn { 
+            border-radius: 1rem; 
+            padding: 1.25rem 1.5rem; 
+            font-weight: 700; 
+            transition: transform 0.1s, box-shadow 0.2s; 
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
+        }
+        .language-toggle { position: relative; width: 50px; height: 26px; background: #bfdbfe; border-radius: 13px; cursor: pointer; transition: all 0.3s ease; border: 1px solid #93c5fd; }
+        .language-toggle::before { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: all 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .language-toggle.active::before { transform: translateX(22px); }
+        .language-toggle::after { content: 'ಕ'; position: absolute; top: 50%; left: 6px; transform: translateY(-50%); color: #1e40af; font-size: 10px; font-weight: bold; }
+        .language-toggle.active::after { content: 'EN'; left: 28px; font-size: 10px; }
+        
+        .mode-btn-text { font-size: 1.1rem; }
+        @media (min-width: 768px) {
+            .mode-btn-text { font-size: 1.25rem; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4">
+
+    <!-- Header / Navigation -->
+    <nav class="w-full max-w-4xl bg-white/30 backdrop-blur-sm rounded-2xl shadow-lg p-4 flex items-center justify-between no-select mb-6">
+        <div class="flex items-center gap-4">
+            <img src="The-Karnataka-Government-Kannada-Logo-Vector.svg-.png" alt="Government of Karnataka" class="w-10 h-10 rounded bg-white p-1">
+            <div>
+                <div class="text-lg font-bold text-gray-800">AKKAPADE</div>
+                <div class="text-xs text-gray-600">Emergency Response System</div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div class="language-toggle" id="languageToggle" onclick="toggleLanguage()"></div>
+        </div>
+    </nav>
+    
+
+
+    <main id="main-page" class="w-full max-w-4xl flex-1">
+        <section class="card p-8 space-y-8">
+            <div class="w-full">
+                <div class="border-l-4 border-red-500 bg-red-50 text-red-800 p-4 rounded-lg">
+                    <div class="flex items-start">
+                        <i class="fas fa-exclamation-triangle text-xl mr-3 mt-1"></i>
+                        <div>
+                            <p id="disclaimer" class="text-sm"><strong>Disclaimer:</strong> This portal is for emergencies only. Misuse may lead to action. Your location will be captured to assist responders.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col items-center text-center">
+                <i class="fa-solid fa-triangle-exclamation text-red-600 text-4xl mb-3"></i>
+                <h2 id="main-heading" class="font-bold text-2xl text-gray-800">Select Reporting Mode</h2>
+                <p id="main-description" class="text-gray-600 mt-2 max-w-md">Choose the appropriate method for your emergency. Location capture is required regardless of your choice.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <a href="report.html?mode=text" class="btn bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-lines text-3xl mb-1"></i>
+                    <span id="text-only-btn" class="mode-btn-text">Text Only 📝</span>
+                </a>
+
+                <a href="report.html?mode=voice" class="btn bg-gradient-to-r from-teal-500 to-cyan-600 text-white flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-microphone text-3xl mb-1"></i>
+                    <span id="text-voice-btn" class="mode-btn-text">Text + Voice 🎙️</span>
+                </a>
+
+                <a href="report.html?mode=video" class="btn bg-gradient-to-r from-pink-500 to-rose-600 text-white flex flex-col items-center justify-center gap-2">
+                    <i class="fa-solid fa-video text-3xl mb-1"></i>
+                    <span id="video-voice-btn" class="mode-btn-text">Video + Voice 🎥</span>
+                </a>
+            </div>
+        </section>
+    </main>
+    
+    <footer class="w-full max-w-4xl mt-8 text-center rounded-2xl p-6 text-gray-700 text-sm">
+        <p class="font-semibold" id="footer-title">Karnataka Government Emergency Services — Aka Padi</p>
+        <p id="footer-subtitle" class="text-xs text-gray-500 mt-1">Your safety is our priority</p>
+    </footer>
+
+    <script>
+        let isEnglish = true; 
+        
+        function loadLanguagePreference() {
+            const savedLanguage = localStorage.getItem('emergencyPortalLanguage');
+            if (savedLanguage === 'kannada') isEnglish = false;
+            else if (savedLanguage === 'english') isEnglish = true;
+        }
+        
+        function saveLanguagePreference() {
+            localStorage.setItem('emergencyPortalLanguage', isEnglish ? 'english' : 'kannada');
+        }
+
+        const translations = {
+            kannada: {
+                disclaimer: "<strong>ಅಸ್ವೀಕರಣೆ:</strong> ಈ ಪೋರ್ಟಲ್ ಕೇವಲ ತುರ್ತು ಸಂದರ್ಭಗಳಿಗಾಗಿ. ದುರುಪಯೋಗವು ಕ್ರಮಕ್ಕೆ ಕಾರಣವಾಗಬಹುದು. ಪ್ರತಿಕ್ರಿಯಾಕಾರರಿಗೆ ಸಹಾಯ ಮಾಡಲು ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಸೆರೆಹಿಡಿಯಲಾಗುತ್ತದೆ.",
+                mainHeading: "ವರದಿ ಮಾಡುವ ವಿಧಾನವನ್ನು ಆಯ್ಕೆಮಾಡಿ",
+                mainDescription: "ನಿಮ್ಮ ತುರ್ತು ಸಂದರ್ಭಕ್ಕೆ ಸೂಕ್ತವಾದ ವಿಧಾನವನ್ನು ಆಯ್ಕೆಮಾಡಿ. ನಿಮ್ಮ ಆಯ್ಕೆಯನ್ನು ಲೆಕ್ಕಿಸದೆ ಸ್ಥಳ ಸೆರೆಹಿಡಿಯುವಿಕೆ ಅಗತ್ಯವಿದೆ.",
+                textOnlyBtn: "ಕೇವಲ ಪಠ್ಯ 📝",
+                textVoiceBtn: "ಪಠ್ಯ + ಧ್ವನಿ 🎙️",
+                videoVoiceBtn: "ವೀಡಿಯೊ + ಧ್ವನಿ 🎥",
+                footerTitle: "ಕರ್ನಾಟಕ ಸರ್ಕಾರದ ತುರ್ತು ಸೇವೆಗಳು — ಅಕ ಪಡಿ",
+                footerSubtitle: "ನಿಮ್ಮ ಸುರಕ್ಷತೆ ನಮ್ಮ ಆದ್ಯತೆ"
+            },
+            english: {
+                disclaimer: "<strong>Disclaimer:</strong> This portal is for emergencies only. Misuse may lead to action. Your location will be captured to assist responders.",
+                mainHeading: "Select Reporting Mode",
+                mainDescription: "Choose the appropriate method for your emergency. Location capture is required regardless of your choice.",
+                textOnlyBtn: "Text Only 📝",
+                textVoiceBtn: "Text + Voice 🎙️",
+                videoVoiceBtn: "Video + Voice 🎥",
+                footerTitle: "Karnataka Government Emergency Services — Aka Padi",
+                footerSubtitle: "Your safety is our priority"
+            }
+        };
+
+        function applyLanguage() {
+            const toggle = document.getElementById('languageToggle');
+            const currentLang = isEnglish ? 'english' : 'kannada';
+            const lang = translations[currentLang];
+            
+            toggle.classList.toggle('active', isEnglish);
+            
+            document.getElementById('disclaimer').innerHTML = lang.disclaimer;
+            document.getElementById('main-heading').textContent = lang.mainHeading;
+            document.getElementById('main-description').textContent = lang.mainDescription;
+            document.getElementById('text-only-btn').textContent = lang.textOnlyBtn;
+            document.getElementById('text-voice-btn').textContent = lang.textVoiceBtn;
+            document.getElementById('video-voice-btn').textContent = lang.videoVoiceBtn;
+            document.getElementById('footer-title').textContent = lang.footerTitle;
+            document.getElementById('footer-subtitle').textContent = lang.footerSubtitle;
+        }
+
+        function toggleLanguage() {
+            isEnglish = !isEnglish;
+            saveLanguagePreference();
+            applyLanguage();
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadLanguagePreference();
+            applyLanguage();
+        });
+    </script>
+</body>
+</html>

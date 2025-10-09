@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ಅಕ ಪಡಿ - Aka Padi Emergency Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+Kannada:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="The-Karnataka-Government-Kannada-Logo-Vector.svg-.png" type="image/x-icon">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+
+  <style>
+    body { 
+      font-family: 'Inter', 'Noto Sans Kannada', sans-serif; 
+      /* Soft blue gradient background */
+      background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%); 
+      min-height: 100vh;
+    }
+    .kannada { font-family: 'Noto Sans Kannada', 'Inter', sans-serif; }
+    .card { 
+      border-radius: 1rem; 
+      box-shadow: 0 4px 12px rgba(10, 40, 80, 0.08); 
+      border: 1px solid #e2e8f0; 
+      background: rgba(255, 255, 255, 0.98);
+    }
+    .btn { border-radius: 0.75rem; padding: 0.75rem 1.25rem; font-weight: 700; transition: transform 0.1s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+
+    .language-toggle { position: relative; width: 50px; height: 26px; background: #bfdbfe; border-radius: 13px; cursor: pointer; transition: all 0.3s ease; border: 1px solid #93c5fd; }
+    .language-toggle::before { content: ''; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; background: white; border-radius: 50%; transition: all 0.3s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .language-toggle.active::before { transform: translateX(22px); }
+    .language-toggle::after { content: 'ಕ'; position: absolute; top: 50%; left: 6px; transform: translateY(-50%); color: #1e40af; font-size: 10px; font-weight: bold; }
+    .language-toggle.active::after { content: 'EN'; left: 28px; font-size: 10px; }
+
+    /* Modal styles for success/error */
+    .modal-overlay {
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.6); display: flex; justify-content: center; align-items: center; z-index: 100; opacity: 0; transition: opacity 0.3s ease-in-out; pointer-events: none;
+    }
+    .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+    .modal-content {
+        background-color: white; padding: 2rem; border-radius: 1rem; text-align: center; max-width: 90%; width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-start min-h-screen p-4">
+
+  <!-- Header (using glass effect for public pages) -->
+    <nav class="w-full max-w-4xl bg-white/30 backdrop-blur-sm rounded-2xl shadow-lg p-4 flex items-center justify-between mb-6">
+      <div class="flex items-center gap-4">
+        <img src="The-Karnataka-Government-Kannada-Logo-Vector.svg-.png" alt="Karnataka Emblem" class="w-10 h-10 rounded bg-white p-1">
+        <div>
+          <div class="text-sm font-semibold text-gray-800">AKKAPADE</div>
+          <div class="text-xs text-gray-600">Emergency Response System</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="language-toggle" id="languageToggle" onclick="toggleLanguage()"></div>
+      </div>
+    </nav>
+
+    <header class="card p-6 mb-6 w-full max-w-4xl">
+      <h1 class="text-2xl font-bold text-gray-800 text-center">ಅಕ ಪಡಿ - Emergency Report</h1>
+      <p class="text-gray-600 text-center mt-1" id="subtitle">Emergency Safety Portal</p>
+    </header>
+  
+
+  <!-- Form Container -->
+  <div class="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden mb-8">
+    <main class="p-6 sm:p-8 space-y-5">
+      <a href="/" class="btn bg-gray-500 text-white flex items-center gap-2 w-max text-sm">
+        <i class="fa-solid fa-arrow-left"></i>
+        <span id="back-btn">Back to Main</span>
+      </a>
+      
+      <!-- Disclaimer -->
+      <div class="border-l-4 border-yellow-500 bg-yellow-50 text-yellow-800 p-4 rounded-lg">
+          <div class="flex items-start">
+            <i class="fas fa-exclamation-triangle text-xl mr-3 mt-1"></i>
+            <p id="disclaimer" class="text-sm">
+                <strong>Emergency Information</strong> <br>
+                This portal is designed for emergency situations. Your location will be automatically captured to ensure quick response from emergency services
+            </p>
+          </div>
+      </div>
+      <form id="dataForm" enctype="multipart/form-data" class="space-y-6">
+
+        <!-- Location -->
+        <div class="card p-5">
+          <label id="location-label" class="font-semibold text-gray-800 flex items-center mb-2">📍 Location (Required)</label>
+          <p id="location-description" class="text-sm text-gray-600 mb-3">Your location is required for emergency services</p>
+          <div class="flex flex-col sm:flex-row sm:space-x-4 space-y-3 sm:space-y-0">
+            <button type="button" id="getLocationBtn" class="btn bg-blue-600 text-white flex-1 hover:bg-blue-700 text-sm">Get My Location</button>
+            <button type="button" id="manualBtn" class="btn bg-gray-600 text-white flex-1 hover:bg-gray-700 text-sm">Enter Manually</button>
+          </div>
+          <p id="locationStatus" class="text-sm text-red-500 mt-3 flex items-center">
+            <i class="fas fa-times-circle mr-2"></i> ❌ Location not captured
+          </p>
+          <input type="hidden" name="latitude">
+          <input type="hidden" name="longitude">
+          <input type="hidden" name="accuracy">
+        </div>
+
+        <!-- Emergency Text -->
+        <div class="card p-5">
+          <label id="emergency-label" class="font-semibold text-gray-800 flex items-center mb-2">📝 Emergency Message</label>
+          <textarea name="text" id="emergency-textarea" class="w-full p-3 border border-gray-300 rounded-lg resize-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" rows="4" placeholder="Describe your emergency..." required></textarea>
+        </div>
+
+        <!-- Phone Number -->
+        <div class="card p-5">
+          <label for="phone" id="phone-label" 
+                 class="font-semibold text-gray-800 flex items-center mb-2">
+            📞 Optional Phone Number
+          </label>
+          
+          <input type="text" 
+                 name="phone" 
+                 id="phone"
+                 placeholder="e.g., 9876543210"
+                 class="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                 maxlength="10"
+                 pattern="[0-9]{10}"
+                 inputmode="numeric"
+                 oninput="this.value = this.value.replace(/[^0-9]/g, '');">
+
+          <p id="phone-note" class="text-sm text-gray-500 mt-2">
+            If provided, must be exactly 10 digits.
+          </p>
+        </div>
+
+        <!-- Voice Recorder -->
+        <div id="voiceSection" class="card p-5 hidden">
+          <label id="voice-label" class="font-semibold text-gray-800 flex items-center mb-2">🎙️ Voice Recording</label>
+          <div class="flex space-x-3">
+            <button type="button" id="startBtn" class="btn bg-green-600 text-white hover:bg-green-700 text-sm">Start Recording</button>
+            <button type="button" id="stopBtn" class="btn bg-red-600 text-white hover:bg-red-700 text-sm" disabled>Stop Recording</button>
+          </div>
+          <p id="recordingStatus" class="text-sm text-gray-500 mt-2">Ready to record</p>
+        </div>
+
+        <!-- Video Recorder -->
+        <div id="videoSection" class="card p-5 hidden">
+          <label id="video-label" class="font-semibold text-gray-800 flex items-center mb-2">🎥 Video Recording</label>
+          <video id="videoPreview" autoplay muted class="w-full h-48 bg-black rounded-lg mb-3"></video>
+          <div class="flex space-x-3">
+            <button type="button" id="startVideoBtn" class="btn bg-green-600 text-white hover:bg-green-700 text-sm">Start Video</button>
+            <button type="button" id="stopVideoBtn" class="btn bg-red-600 text-white hover:bg-red-700 text-sm" disabled>Stop Video</button>
+          </div>
+          <p id="videoStatus" class="text-sm text-gray-500 mt-2">Ready to record video</p>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" id="submit-btn" class="btn bg-blue-700 text-white py-3 w-full hover:bg-blue-800">
+          🚨 Submit Emergency Report
+        </button>
+      </form>
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="w-full max-w-4xl mt-8 text-center rounded-2xl p-6 text-gray-700 text-sm">
+    <p class="font-semibold" id="footer-title">Karnataka Government Emergency Services — Aka Padi</p>
+    <p id="footer-subtitle" class="text-xs text-gray-500 mt-1">Your safety is our priority</p>
+  </footer>
+
+  <!-- Submission Success Pop-up -->
+  <div id="successPopup" class="modal-overlay">
+    <div class="modal-content">
+        <i class="fa-solid fa-check-circle text-green-600 text-5xl mb-4"></i>
+        <h3 id="popup-title" class="text-2xl font-bold text-gray-800 mb-2">Submission Successful!</h3>
+        <p id="popup-message" class="text-gray-600 mb-4">Your emergency report has been sent. Please try stay in your current location for 5 minutes.</p>
+        <button id="closePopupBtn" class="btn bg-blue-600 text-white px-6 py-2">Close</button>
+    </div>
+  </div>
+
+  <!-- Submission Error Pop-up (BUG FIX) -->
+  <div id="errorPopup" class="modal-overlay">
+    <div class="modal-content">
+        <i class="fa-solid fa-triangle-exclamation text-red-600 text-5xl mb-4"></i>
+        <h3 id="error-title" class="text-2xl font-bold text-gray-800 mb-2">Submission Failed!</h3>
+        <p id="error-message" class="text-gray-600 mb-4">An unknown error occurred.</p>
+        <button id="closeErrorPopupBtn" class="btn bg-red-600 text-white px-6 py-2">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = new URLSearchParams(window.location.search).get('api') || window.location.origin;
+    let isEnglish = true;
+    
+    function loadLanguagePreference() {
+        const savedLanguage = localStorage.getItem('emergencyPortalLanguage');
+        if (savedLanguage === 'kannada') isEnglish = false;
+        else if (savedLanguage === 'english') isEnglish = true;
+    }
+    
+    function saveLanguagePreference() {
+        localStorage.setItem('emergencyPortalLanguage', isEnglish ? 'english' : 'kannada');
+    }
+    
+    const translations = {
+        kannada: {
+            disclaimer: "<strong>ತುರ್ತು ಮಾಹಿತಿ</strong> <br> ಈ ಪೋರ್ಟಲ್ ತುರ್ತು ಸಂದರ್ಭಗಳಿಗಾಗಿ ವಿನ್ಯಾಸಗೊಳಿಸಲಾಗಿದೆ. ತುರ್ತು ಸೇವೆಗಳಿಂದ ತ್ವರಿತ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ಖಚಿತಪಡಿಸಲು ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಸೆರೆಹಿಡಿಯಲಾಗುತ್ತದೆ",
+            backBtn: "ಮುಖ್ಯ ಪುಟಕ್ಕೆ ಹಿಂದೆ",
+            locationLabel: "📍 ಸ್ಥಳ (ಅಗತ್ಯವಿದೆ)",
+            locationDescription: "ತುರ್ತು ಸೇವೆಗಳಿಗಾಗಿ ನಿಮ್ಮ ಸ್ಥಳ ಅಗತ್ಯವಾಗಿದೆ",
+            emergencyLabel: "📝 ತುರ್ತು ಸಂದೇಶ",
+            emergencyPlaceholder: "ನಿಮ್ಮ ತುರ್ತು ಸಂದರ್ಭವನ್ನು ವಿವರಿಸಿ...",
+            phoneLabel: "📞 ಐಚ್ಛಿಕ ಫೋನ್ ಸಂಖ್ಯೆ",
+            phonePlaceholder: "ಉದಾಹರಣೆ: 9876543210",
+            phoneNote: "ಒದಗಿಸಿದರೆ, ನಿಖರವಾಗಿ 10 ಅಂಕೆಗಳು ಇರಬೇಕು.",
+            voiceLabel: "🎙️ ಧ್ವನಿ ರೆಕಾರ್ಡಿಂಗ್",
+            videoLabel: "🎥 ವೀಡಿಯೊ ರೆಕಾರ್ಡಿಂಗ್",
+            submitBtn: "🚨 ತುರ್ತು ವರದಿಯನ್ನು ಸಲ್ಲಿಸಿ",
+            footerTitle: "ಕರ್ನಾಟಕ ಸರ್ಕಾರದ ತುರ್ತು ಸೇವೆಗಳು",
+            footerSubtitle: "ನಿಮ್ಮ ಸುರಕ್ಷತೆ ನಮ್ಮ ಆದ್ಯತೆ",
+            popupTitle: "ಸಲ್ಲಿಸುವಿಕೆ ಯಶಸ್ವಿಯಾಗಿದೆ!",
+            popupMessage: "ನಿಮ್ಮ ತುರ್ತು ವರದಿಯನ್ನು ಕಳುಹಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಮುಂದಿನ 5 ನಿಮಿಷಗಳ ಕಾಲ ನಿಮ್ಮ ಪ್ರಸ್ತುತ ಸ್ಥಳದಲ್ಲಿ ಇರಿ ಪ್ರಯತ್ನಿಸಿ.",
+            errorTitle: "ಸಲ್ಲಿಸುವಿಕೆ ವಿಫಲವಾಗಿದೆ!",
+            networkError: "ಜಾಲ ದೋಷ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+        },
+        english: {
+            disclaimer: "<strong>Emergency Information</strong> <br> This portal is designed for emergency situations. Your location will be automatically captured to ensure quick response from emergency services",
+            backBtn: "Back to Main",
+            locationLabel: "📍 Location (Required)",
+            locationDescription: "Your location is required for emergency services",
+            emergencyLabel: "📝 Emergency Message",
+            emergencyPlaceholder: "Describe your emergency...",
+            phoneLabel: "📞 Optional Phone Number",
+            phonePlaceholder: "e.g., 9876543210",
+            phoneNote: "If provided, must be exactly 10 digits.",
+            voiceLabel: "🎙️ Voice Recording",
+            videoLabel: "🎥 Video Recording",
+            submitBtn: "🚨 Submit Emergency Report",
+            footerTitle: "Karnataka Government Emergency Services",
+            footerSubtitle: "Your safety is our priority",
+            popupTitle: "Submission Successful!",
+            popupMessage: "Your emergency report has been sent. Please stay in your current location for 5 minutes.",
+            errorTitle: "Submission Failed!",
+            networkError: "Network error. Please try again."
+        }
+    };
+    
+    function applyLanguage() {
+        const toggle = document.getElementById('languageToggle');
+        const currentLang = isEnglish ? 'english' : 'kannada';
+        const lang = translations[currentLang];
+        
+        toggle.classList.toggle('active', isEnglish);
+        
+        document.getElementById('disclaimer').innerHTML = lang.disclaimer;
+        document.getElementById('back-btn').textContent = lang.backBtn;
+        document.getElementById('location-label').textContent = lang.locationLabel;
+        document.getElementById('location-description').textContent = lang.locationDescription;
+        document.getElementById('emergency-label').textContent = lang.emergencyLabel;
+        document.getElementById('emergency-textarea').placeholder = lang.emergencyPlaceholder;
+        document.getElementById('phone-label').textContent = lang.phoneLabel;
+        document.getElementById('phone').placeholder = lang.phonePlaceholder;
+        document.getElementById('phone-note').textContent = lang.phoneNote;
+        if (document.getElementById('voice-label')) document.getElementById('voice-label').textContent = lang.voiceLabel;
+        if (document.getElementById('video-label')) document.getElementById('video-label').textContent = lang.videoLabel;
+        document.getElementById('submit-btn').textContent = lang.submitBtn;
+        document.getElementById('footer-title').textContent = lang.footerTitle;
+        document.getElementById('footer-subtitle').textContent = lang.footerSubtitle;
+        document.getElementById('popup-title').textContent = lang.popupTitle;
+        document.getElementById('popup-message').textContent = lang.popupMessage;
+        document.getElementById('error-title').textContent = lang.errorTitle;
+    }
+    
+    function toggleLanguage() {
+        isEnglish = !isEnglish;
+        saveLanguagePreference();
+        applyLanguage();
+    }
+    
+    function showPopup(isError, message) {
+        const popup = isError ? document.getElementById('errorPopup') : document.getElementById('successPopup');
+        const msgEl = isError ? document.getElementById('error-message') : document.getElementById('popup-message');
+        
+        if (isError) {
+             msgEl.textContent = message;
+        } else {
+             msgEl.textContent = translations[isEnglish ? 'english' : 'kannada'].popupMessage;
+        }
+
+        popup.classList.add('visible');
+    }
+
+    function hidePopup(isError) {
+        const popup = isError ? document.getElementById('errorPopup') : document.getElementById('successPopup');
+        popup.classList.remove('visible');
+    }
+
+    document.getElementById('closePopupBtn').addEventListener('click', () => hidePopup(false));
+    document.getElementById('closeErrorPopupBtn').addEventListener('click', () => hidePopup(true));
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        loadLanguagePreference();
+        applyLanguage();
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const mode = urlParams.get("mode");
+        if (mode === "voice") document.getElementById("voiceSection").classList.remove("hidden");
+        if (mode === "video") document.getElementById("videoSection").classList.remove("hidden");
+    });
+    
+    // ===== Location =====
+    const latitudeInput = document.querySelector('input[name="latitude"]');
+    const longitudeInput = document.querySelector('input[name="longitude"]');
+    const locationStatus = document.getElementById('locationStatus');
+
+    document.getElementById('getLocationBtn').addEventListener('click', () => {
+      if (!navigator.geolocation) {
+        locationStatus.innerHTML = '<i class="fas fa-times-circle mr-2"></i> ❌ Geolocation is not supported by your browser.';
+        return;
+      }
+      locationStatus.innerHTML = '<i class="fas fa-satellite-dish fa-spin mr-2"></i> 📡 Getting high-accuracy location...';
+      locationStatus.classList.remove('text-red-500');
+      locationStatus.classList.add('text-blue-500');
+      
+      const options = { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 };
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          latitudeInput.value = latitude;
+          longitudeInput.value = longitude;
+          const accEl = document.querySelector('input[name="accuracy"]');
+          if (accEl) accEl.value = accuracy;
+          const accStr = Number.isFinite(accuracy) ? ` (±${Math.round(accuracy)}m)` : "";
+          locationStatus.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ✅ Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}${accStr}`;
+          locationStatus.classList.remove('text-red-500', 'text-blue-500');
+          locationStatus.classList.add('text-green-600');
+        },
+        (err) => {
+          locationStatus.innerHTML = `<i class="fas fa-times-circle mr-2"></i> ❌ Unable to get location${err && err.message ? ": " + err.message : ""}`;
+          locationStatus.classList.remove('text-blue-500');
+          locationStatus.classList.add('text-red-500');
+        },
+        options
+      );
+    });
+
+    document.getElementById('manualBtn').addEventListener('click', () => {
+      const lat = prompt("Enter latitude:");
+      const lon = prompt("Enter longitude:");
+      if (lat && lon) {
+        latitudeInput.value = lat;
+        longitudeInput.value = lon;
+        locationStatus.innerHTML = `<i class="fas fa-check-circle mr-2"></i> ✅ Location manually set: ${lat}, ${lon}`;
+        locationStatus.classList.remove('text-red-500', 'text-blue-500');
+        locationStatus.classList.add('text-green-600');
+      }
+    });
+
+    // ===== Recording Logic (Voice & Video) - Preserved =====
+    let audioBlob = null, mediaRecorder;
+    document.getElementById('startBtn')?.addEventListener('click', async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        let chunks = [];
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        mediaRecorder.onstop = () => audioBlob = new Blob(chunks, { type: "audio/webm" });
+        mediaRecorder.start();
+        document.getElementById('recordingStatus').textContent = "🎤 Recording...";
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+      } catch (e) {
+        document.getElementById('recordingStatus').textContent = `Microphone error: ${e.message}`;
+      }
+    });
+
+    document.getElementById('stopBtn')?.addEventListener('click', () => {
+      mediaRecorder.stop();
+      document.getElementById('recordingStatus').textContent = "✅ Recording saved";
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('stopBtn').disabled = true;
+    });
+
+    let videoBlob = null, videoRecorder, videoStream;
+    document.getElementById('startVideoBtn')?.addEventListener('click', async () => {
+      try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        document.getElementById('videoPreview').srcObject = videoStream;
+        videoRecorder = new MediaRecorder(videoStream);
+        let chunks = [];
+        videoRecorder.ondataavailable = e => chunks.push(e.data);
+        videoRecorder.onstop = () => videoBlob = new Blob(chunks, { type: "video/webm" });
+        videoRecorder.start();
+        document.getElementById('videoStatus').textContent = "📹 Recording...";
+        document.getElementById('startVideoBtn').disabled = true;
+        document.getElementById('stopVideoBtn').disabled = false;
+      } catch (e) {
+         document.getElementById('videoStatus').textContent = `Camera error: ${e.message}`;
+      }
+    });
+
+    document.getElementById('stopVideoBtn')?.addEventListener('click', () => {
+      videoRecorder.stop();
+      videoStream.getTracks().forEach(t => t.stop());
+      document.getElementById('videoStatus').textContent = "✅ Video saved";
+      document.getElementById('startVideoBtn').disabled = false;
+      document.getElementById('stopVideoBtn').disabled = true;
+    });
+
+    // ===== Form Submit (BUG FIX implemented here) =====
+    document.getElementById("dataForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const lang = translations[isEnglish ? 'english' : 'kannada'];
+
+      const phoneVal = document.getElementById("phone").value.trim();
+      if (phoneVal && !/^\d{10}$/.test(phoneVal)) {
+        document.getElementById('phone-note').textContent = "Phone number must be exactly 10 digits.";
+        return;
+      }
+
+      if (!latitudeInput.value || !longitudeInput.value) {
+        locationStatus.innerHTML = `<i class="fas fa-times-circle mr-2"></i> ❌ Please capture or enter your location before submitting.`;
+        locationStatus.classList.add('text-red-500');
+        return;
+      }
+
+      const fd = new FormData(e.target);
+      if (audioBlob) fd.append("voice", audioBlob, "recording.webm");
+      if (videoBlob) fd.append("video", videoBlob, "recording.webm");
+
+      document.getElementById("submit-btn").textContent = "Submitting...";
+      document.getElementById("submit-btn").disabled = true;
+
+      try {
+        const response = await fetch('/api/submit', {
+          method: 'POST',
+          body: fd
+        });
+
+        if (response.ok) {
+          showPopup(false); // Success popup
+          e.target.reset(); // Reset form on success
+        } else {
+          // BUG FIX: Replaced alert() with custom error popup
+          showPopup(true, `Failed to submit report. Server response: HTTP ${response.status}`); 
+        }
+      } catch (err) {
+        // BUG FIX: Replaced alert() with custom error popup
+        showPopup(true, `${lang.networkError} Error: ${err.message}`);
+      } finally {
+        document.getElementById("submit-btn").textContent = lang.submitBtn;
+        document.getElementById("submit-btn").disabled = false;
+      }
+    });
+  </script>
+ </body>
+</html>

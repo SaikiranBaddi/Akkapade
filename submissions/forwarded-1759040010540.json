@@ -1,0 +1,19 @@
+{
+  "metaFile": "report-1759039904514.json",
+  "mode": "audio",
+  "text": "jkjfkj",
+  "phone": "4666646464",
+  "phoneNumber": "4666646464",
+  "location": {
+    "latitude": 13.9558912,
+    "longitude": 75.5859456,
+    "accuracy": 129286.72104919796
+  },
+  "audio": "953b9fb14c17c03e3ac4cf3fc3e96676",
+  "video": null,
+  "audioUrl": "/uploads/953b9fb14c17c03e3ac4cf3fc3e96676",
+  "videoUrl": null,
+  "submittedAt": "2025-09-28T06:11:44.513Z",
+  "forwardedAt": "2025-09-28T06:13:30.540Z",
+  "visibleAfter": "2025-09-28T06:13:30.540Z"
+}
