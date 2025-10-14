@@ -35,8 +35,8 @@ const PORT = process.env.PORT || 5000;
  * latitude DOUBLE PRECISION,
  * longitude DOUBLE PRECISION,
  * accuracy DOUBLE PRECISION,
- * audio_url TEXT,         <-- Stored URL from Cloudinary
- * video_url TEXT,         <-- Stored URL from Cloudinary
+ * audio_url TEXT, 
+ * video_url TEXT, 
  * mode VARCHAR(50) NOT NULL DEFAULT 'form',
  * submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
  * );
@@ -58,6 +58,32 @@ pool
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
+
+// ---------- AUTHENTICATION MIDDLEWARE FOR REPORTS API ----------
+/**
+ * Middleware to check for a valid REPORTS_API_KEY in the 'x-api-key' header.
+ * This secures the /api/reports endpoint.
+ */
+const authenticateReportsAccess = (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  const expectedKey = process.env.REPORTS_API_KEY;
+
+  if (!expectedKey || expectedKey.length < 10) {
+    console.error("⚠️ SECURITY ALERT: REPORTS_API_KEY is not configured properly in .env!");
+    // Fail closed if security config is missing
+    return res.status(503).json({ success: false, error: "Server configuration error. Key missing." });
+  }
+
+  if (apiKey && apiKey === expectedKey) {
+    // Key matches, allow access
+    next();
+  } else {
+    // Key is missing or incorrect, deny access
+    console.warn(`Attempted unauthorized access to /api/reports from ${req.ip}`);
+    res.status(401).json({ success: false, error: "Unauthorized access: Invalid or missing API Key." });
+  }
+};
+
 
 // ---------- CLOUDINARY SETUP ----------
 if (
@@ -184,8 +210,8 @@ app.post("/api/submit", (req, res) => {
   });
 });
 
-// ---------- FETCH ALL REPORTS ----------
-app.get("/api/reports", async (req, res) => {
+// ---------- FETCH ALL REPORTS (SECURED by authenticateReportsAccess middleware) ----------
+app.get("/api/reports", authenticateReportsAccess, async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM reports ORDER BY submitted_at DESC");
     res.json(rows);
