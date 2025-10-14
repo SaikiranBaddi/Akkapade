@@ -1,16 +1,17 @@
-// server.js - Aka Padi Emergency Portal with PostgreSQL + Cloudinary
+// server.js - Aka Padi Emergency Portal with PostgreSQL + Cloudinary + WebSockets
 import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
+import http from "http";
 import bodyParser from "body-parser";
 import multer from "multer";
 import cloudinary from "cloudinary";
 import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { fileURLToPath } from "url";
 import path from "path";
-import fs from "fs";
 import pkg from "pg";
+import { WebSocketServer } from "ws";
 
 const { Pool } = pkg;
 
@@ -24,8 +25,7 @@ const PORT = process.env.PORT || 5000;
 
 // ---------- DATABASE SETUP ----------
 /*
- * IMPORTANT: Ensure your PostgreSQL database has a table named 'reports' 
- * with the following minimum schema to store report data and media URLs:
+ * IMPORTANT: Ensure your PostgreSQL database has a 'reports' table with this schema:
  *
  * CREATE TABLE reports (
  * id SERIAL PRIMARY KEY,
@@ -35,9 +35,10 @@ const PORT = process.env.PORT || 5000;
  * latitude DOUBLE PRECISION,
  * longitude DOUBLE PRECISION,
  * accuracy DOUBLE PRECISION,
- * audio_url TEXT, 
- * video_url TEXT, 
+ * audio_url TEXT,
+ * video_url TEXT,
  * mode VARCHAR(50) NOT NULL DEFAULT 'form',
+ * status VARCHAR(50) NOT NULL DEFAULT 'pending', -- Crucial for tracking state
  * submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
  * );
  */
@@ -48,7 +49,6 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false },
 });
 
-// Test DB connection on startup
 pool
   .connect()
   .then(() => console.log("✅ Connected to PostgreSQL database"))
@@ -58,32 +58,6 @@ pool
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
-
-// ---------- AUTHENTICATION MIDDLEWARE FOR REPORTS API ----------
-/**
- * Middleware to check for a valid REPORTS_API_KEY in the 'x-api-key' header.
- * This secures the /api/reports endpoint.
- */
-const authenticateReportsAccess = (req, res, next) => {
-  const apiKey = req.headers['x-api-key'];
-  const expectedKey = process.env.REPORTS_API_KEY;
-
-  if (!expectedKey || expectedKey.length < 10) {
-    console.error("⚠️ SECURITY ALERT: REPORTS_API_KEY is not configured properly in .env!");
-    // Fail closed if security config is missing
-    return res.status(503).json({ success: false, error: "Server configuration error. Key missing." });
-  }
-
-  if (apiKey && apiKey === expectedKey) {
-    // Key matches, allow access
-    next();
-  } else {
-    // Key is missing or incorrect, deny access
-    console.warn(`Attempted unauthorized access to /api/reports from ${req.ip}`);
-    res.status(401).json({ success: false, error: "Unauthorized access: Invalid or missing API Key." });
-  }
-};
-
 
 // ---------- CLOUDINARY SETUP ----------
 if (
@@ -130,42 +104,17 @@ app.post("/api/submit", (req, res) => {
     }
 
     try {
-      const name = (req.body?.name ?? "").trim();
-      const complaint = req.body?.complaint ?? req.body?.text ?? "";
-
-      // Detect phone field (any name variation)
-      const findPhone = (obj) => {
-        const keys = ["phone", "phonenumber", "phoneNumber", "mobile", "tel", "contact"];
-        for (const k of keys) if (obj?.[k]) return obj[k];
-        return "";
-      };
-      const phone = findPhone(req.body)?.toString().trim() || "";
-
-      // Parse location
-      const { latitude, longitude, accuracy } = req.body;
-      const latNum = latitude ? Number(latitude) : null;
-      const lonNum = longitude ? Number(longitude) : null;
-      const accNum = accuracy ? Number(accuracy) : null;
-
-      // Extract uploaded file URLs
+      const { name, complaint, latitude, longitude, accuracy } = req.body;
+      const phone = req.body.phone || "";
+      
       let audioUrl = null;
       let videoUrl = null;
+
       if (req.files && Array.isArray(req.files)) {
-        // Log all files received for debugging purposes
-        console.log("🔍 Files received:", req.files.map(f => ({ 
-          fieldname: f.fieldname, 
-          mimetype: f.mimetype, 
-          path: f.path 
-        })));
-
         for (const file of req.files) {
-          const fieldNameLower = file.fieldname.toLowerCase();
-          const mimeTypeLower = file.mimetype ? file.mimetype.toLowerCase() : '';
-
-          // Check field name OR mimetype to robustly identify audio/video
-          if (fieldNameLower.includes("audio") || mimeTypeLower.startsWith("audio/")) {
+          if (file.mimetype.startsWith("audio/")) {
             audioUrl = file.path;
-          } else if (fieldNameLower.includes("video") || mimeTypeLower.startsWith("video/")) {
+          } else if (file.mimetype.startsWith("video/")) {
             videoUrl = file.path;
           }
         }
@@ -173,36 +122,22 @@ app.post("/api/submit", (req, res) => {
 
       const mode = videoUrl ? "video" : audioUrl ? "audio" : "form";
 
-      // ---------- SAVE TO POSTGRESQL ----------
       const insertQuery = `
         INSERT INTO reports
-        (name, phone, complaint, latitude, longitude, accuracy, audio_url, video_url, mode, submitted_at)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
+        (name, phone, complaint, latitude, longitude, accuracy, audio_url, video_url, mode, status, submitted_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW())
         RETURNING id;
       `;
-
-      const values = [
-        name || null,
-        phone || null,
-        complaint || null,
-        latNum,
-        lonNum,
-        accNum,
-        audioUrl, // <-- The Cloudinary URL for audio is saved here
-        videoUrl, // <-- The Cloudinary URL for video is saved here
-        mode,
-      ];
-
+      const values = [name, phone, complaint, latitude, longitude, accuracy, audioUrl, videoUrl, mode];
       const result = await pool.query(insertQuery, values);
       const newId = result.rows[0].id;
 
-      console.log("📩 Report saved to DB:", { id: newId, name, phone, mode });
-
-      res.json({
-        success: true,
-        message: "Report submitted successfully!",
-        reportId: newId,
-      });
+      console.log("📩 Report saved to DB:", { id: newId, mode });
+      
+      // **Notify all clients that a new report has arrived**
+      broadcastUpdate();
+      
+      res.json({ success: true, message: "Report submitted successfully!", reportId: newId });
     } catch (err) {
       console.error("❌ Error saving report:", err);
       res.status(500).json({ success: false, error: err.message });
@@ -210,8 +145,8 @@ app.post("/api/submit", (req, res) => {
   });
 });
 
-// ---------- FETCH ALL REPORTS (SECURED by authenticateReportsAccess middleware) ----------
-app.get("/api/reports", authenticateReportsAccess, async (req, res) => {
+// ---------- FETCH ALL REPORTS ----------
+app.get("/api/reports", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM reports ORDER BY submitted_at DESC");
     res.json(rows);
@@ -221,7 +156,73 @@ app.get("/api/reports", authenticateReportsAccess, async (req, res) => {
   }
 });
 
-// ---------- START SERVER ----------
-app.listen(PORT, "0.0.0.0", () => {
+// ---------- ACKNOWLEDGE A REPORT ----------
+app.post("/api/reports/:id/acknowledge", async (req, res) => {
+    const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({ success: false, error: "Report ID is required." });
+    }
+
+    try {
+        const updateQuery = `
+            UPDATE reports
+            SET status = 'acknowledged'
+            WHERE id = $1
+            RETURNING id, status;
+        `;
+        const result = await pool.query(updateQuery, [id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, error: `Report with ID ${id} not found.` });
+        }
+
+        console.log(`✅ Report ${id} status updated to 'acknowledged'`);
+
+        // **This is the key for real-time updates.**
+        // **Broadcast the change to all connected clients.**
+        broadcastUpdate();
+
+        res.json({
+            success: true,
+            message: `Report ${id} has been acknowledged.`,
+            report: result.rows[0],
+        });
+
+    } catch (err) {
+        console.error(`❌ Error acknowledging report ${id}:`, err);
+        res.status(500).json({ success: false, error: "Failed to update report status." });
+    }
+});
+
+// ---------- SERVER & WEBSOCKET SETUP ----------
+// Create an HTTP server from the Express app
+const server = http.createServer(app);
+
+// Create a WebSocket server that attaches to our HTTP server
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', ws => {
+  console.log('🔗 New client connected via WebSocket');
+  ws.on('close', () => {
+    console.log('🔌 Client disconnected');
+  });
+  ws.on('error', console.error);
+});
+
+// Function to send a "refresh" message to every connected client
+function broadcastUpdate() {
+  console.log(`📢 Broadcasting update to ${wss.clients.size} clients...`);
+  const message = JSON.stringify({ type: 'REFRESH_REPORTS' });
+  
+  wss.clients.forEach(client => {
+    if (client.readyState === client.OPEN) {
+      client.send(message);
+    }
+  });
+}
+
+// Start the server
+server.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Aka Padi Emergency Portal running on port ${PORT}`);
 });
