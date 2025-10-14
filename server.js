@@ -125,9 +125,23 @@ app.post("/api/submit", (req, res) => {
       let audioUrl = null;
       let videoUrl = null;
       if (req.files && Array.isArray(req.files)) {
+        // Log all files received for debugging purposes
+        console.log("🔍 Files received:", req.files.map(f => ({ 
+          fieldname: f.fieldname, 
+          mimetype: f.mimetype, 
+          path: f.path 
+        })));
+
         for (const file of req.files) {
-          if (file.fieldname.toLowerCase().includes("audio")) audioUrl = file.path;
-          if (file.fieldname.toLowerCase().includes("video")) videoUrl = file.path;
+          const fieldNameLower = file.fieldname.toLowerCase();
+          const mimeTypeLower = file.mimetype ? file.mimetype.toLowerCase() : '';
+
+          // Check field name OR mimetype to robustly identify audio/video
+          if (fieldNameLower.includes("audio") || mimeTypeLower.startsWith("audio/")) {
+            audioUrl = file.path;
+          } else if (fieldNameLower.includes("video") || mimeTypeLower.startsWith("video/")) {
+            videoUrl = file.path;
+          }
         }
       }
 
