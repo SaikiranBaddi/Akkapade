@@ -23,6 +23,24 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ---------- DATABASE SETUP ----------
+/*
+ * IMPORTANT: Ensure your PostgreSQL database has a table named 'reports' 
+ * with the following minimum schema to store report data and media URLs:
+ *
+ * CREATE TABLE reports (
+ * id SERIAL PRIMARY KEY,
+ * name VARCHAR(255),
+ * phone VARCHAR(50),
+ * complaint TEXT,
+ * latitude DOUBLE PRECISION,
+ * longitude DOUBLE PRECISION,
+ * accuracy DOUBLE PRECISION,
+ * audio_url TEXT,         <-- Stored URL from Cloudinary
+ * video_url TEXT,         <-- Stored URL from Cloudinary
+ * mode VARCHAR(50) NOT NULL DEFAULT 'form',
+ * submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+ * );
+ */
 const pool = new Pool({
   connectionString:
     process.env.DATABASE_URL ||
@@ -130,8 +148,8 @@ app.post("/api/submit", (req, res) => {
         latNum,
         lonNum,
         accNum,
-        audioUrl,
-        videoUrl,
+        audioUrl, // <-- The Cloudinary URL for audio is saved here
+        videoUrl, // <-- The Cloudinary URL for video is saved here
         mode,
       ];
 
