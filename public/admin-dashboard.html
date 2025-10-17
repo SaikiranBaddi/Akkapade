@@ -51,7 +51,7 @@
     </nav>
 
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div class="card p-6 text-center">
             <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2"></i>
             <div class="text-2xl font-bold text-gray-800" id="totalReports">0</div>
@@ -66,37 +66,6 @@
             <i class="fas fa-video text-blue-500 text-3xl mb-2"></i>
             <div class="text-2xl font-bold text-gray-800" id="mediaReports">0</div>
             <div class="text-sm text-gray-600">With Media</div>
-        </div>
-        <div class="card p-6 text-center">
-            <i class="fas fa-users text-green-500 text-3xl mb-2"></i>
-            <div class="text-2xl font-bold text-gray-800" id="activeUsers">0</div>
-            <div class="text-sm text-gray-600">Active Users</div>
-        </div>
-    </div>
-
-    <!-- User Status Section -->
-    <div class="card p-6 mb-6">
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-bold text-gray-800">User Status</h2>
-            <button onclick="refreshUserStatus()" class="btn bg-green-500 text-white text-sm">
-                <i class="fas fa-refresh mr-1"></i>
-                Refresh
-            </button>
-        </div>
-        <div id="userStatusContainer" class="overflow-x-auto">
-            <table class="w-full">
-                <thead>
-                    <tr class="border-b border-gray-200">
-                        <th class="text-left py-2 px-3 font-semibold text-gray-700 text-sm">User ID</th>
-                        <th class="text-left py-2 px-3 font-semibold text-gray-700 text-sm">Status</th>
-                        <th class="text-left py-2 px-3 font-semibold text-gray-700 text-sm">Battery</th>
-                        <th class="text-left py-2 px-3 font-semibold text-gray-700 text-sm">Network</th>
-                        <th class="text-left py-2 px-3 font-semibold text-gray-700 text-sm">Last Seen</th>
-                    </tr>
-                </thead>
-                <tbody id="userStatusTable">
-                </tbody>
-            </table>
         </div>
     </div>
 
@@ -162,57 +131,10 @@
         }
 
         let reports = [];
-        let userStatuses = [];
 
         function logout() {
             localStorage.removeItem('adminLoggedIn');
             window.location.href = 'admin.html';
-        }
-
-        async function loadUserStatus() {
-            try {
-                const response = await fetch('/api/user-status');
-                userStatuses = await response.json();
-                renderUserStatus();
-                updateUserStats();
-            } catch (error) {
-                console.error('Error loading user status:', error);
-            }
-        }
-
-        function updateUserStats() {
-            const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-            const activeUsers = userStatuses.filter(u => new Date(u.last_seen) > fiveMinutesAgo);
-            document.getElementById('activeUsers').textContent = activeUsers.length;
-        }
-
-        function renderUserStatus() {
-            const tbody = document.getElementById('userStatusTable');
-            tbody.innerHTML = userStatuses.map(user => `
-                <tr class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="py-2 px-3 text-sm font-mono">${user.user_id.substring(0, 12)}...</td>
-                    <td class="py-2 px-3">
-                        <span class="px-2 py-1 text-xs rounded-full ${getStatusColor(user.status)}">
-                            ${user.status}
-                        </span>
-                    </td>
-                    <td class="py-2 px-3 text-sm">${user.battery_level ? user.battery_level + '%' : 'N/A'}</td>
-                    <td class="py-2 px-3 text-sm">${user.network_type || 'N/A'}</td>
-                    <td class="py-2 px-3 text-sm">${new Date(user.last_seen).toLocaleString()}</td>
-                </tr>
-            `).join('');
-        }
-
-        function getStatusColor(status) {
-            switch(status) {
-                case 'submitting_report': return 'bg-red-100 text-red-800';
-                case 'online': return 'bg-green-100 text-green-800';
-                default: return 'bg-gray-100 text-gray-800';
-            }
-        }
-
-        function refreshUserStatus() {
-            loadUserStatus();
         }
 
         async function loadReports() {
@@ -342,12 +264,6 @@
 
         // Initialize
         loadReports();
-        loadUserStatus();
-        
-        // Auto-refresh every 30 seconds
-        setInterval(() => {
-            loadUserStatus();
-        }, 30000);
     </script>
 </body>
 </html>
