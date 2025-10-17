@@ -156,7 +156,7 @@ app.post("/api/submit", (req, res) => {
 // ---------- FETCH ALL REPORTS (Unchanged) ----------
 app.get("/api/reports", async (req, res) => {
  try {
-  const { rows } = await pool.query("SELECT * FROM reports WHERE (status = 'acknowledged') OR (status = 'pending' AND submitted_at <= NOW() - INTERVAL '5 minutes') ORDER BY submitted_at DESC");
+  const { rows } = await pool.query("SELECT * FROM reports WHERE (status = 'acknowledged') OR (status = 'pending' AND submitted_at <= NOW() - INTERVAL '5 minute') ORDER BY submitted_at DESC");
   res.json(rows);
  } catch (err) {
   console.error("❌ Error fetching reports:", err);
