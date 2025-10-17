@@ -30,28 +30,7 @@ const pool = new Pool({
 });
 pool
  .connect()
- .then(async () => {
-  console.log("✅ Connected to PostgreSQL database");
-  // Initialize user_status table
-  try {
-   await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_status (
-     id SERIAL PRIMARY KEY,
-     user_id VARCHAR(255) UNIQUE NOT NULL,
-     status VARCHAR(100) NOT NULL,
-     battery_level INTEGER,
-     network_type VARCHAR(50),
-     device_info JSONB,
-     last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-    );
-    CREATE INDEX IF NOT EXISTS idx_user_status_user_id ON user_status(user_id);
-   `);
-   console.log("✅ User status table initialized");
-  } catch (err) {
-   console.error("❌ Error initializing user status table:", err.message);
-  }
- })
+ .then(() => console.log("✅ Connected to PostgreSQL database"))
  .catch((err) => console.error("❌ Database connection failed:", err.message));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -142,37 +121,6 @@ app.get("/api/reports", async (req, res) => {
  }
 });
 
-
-// ---------- USER STATUS ENDPOINTS ----------
-app.post("/api/user-status", async (req, res) => {
- try {
-  const { userId, status, batteryLevel, networkType, deviceInfo } = req.body;
-  
-  const insertQuery = `
-   INSERT INTO user_status (user_id, status, battery_level, network_type, device_info, last_seen)
-   VALUES ($1, $2, $3, $4, $5, NOW())
-   ON CONFLICT (user_id) DO UPDATE SET
-    status = $2, battery_level = $3, network_type = $4, device_info = $5, last_seen = NOW()
-   RETURNING *;
-  `;
-  
-  const result = await pool.query(insertQuery, [userId, status, batteryLevel, networkType, JSON.stringify(deviceInfo)]);
-  res.json({ success: true, userStatus: result.rows[0] });
- } catch (err) {
-  console.error("❌ Error updating user status:", err);
-  res.status(500).json({ success: false, error: err.message });
- }
-});
-
-app.get("/api/user-status", async (req, res) => {
- try {
-  const { rows } = await pool.query("SELECT * FROM user_status ORDER BY last_seen DESC");
-  res.json(rows);
- } catch (err) {
-  console.error("❌ Error fetching user status:", err);
-  res.status(500).json({ success: false, error: err.message });
- }
-});
 
 // ---------- ACKNOWLEDGE ENDPOINT (MODIFIED to broadcast update) ==========
 app.post("/api/reports/:id/acknowledge", async (req, res) => {
