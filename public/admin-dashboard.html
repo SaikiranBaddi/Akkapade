@@ -88,7 +88,7 @@
                         <thead>
                             <tr class="border-b border-gray-200">
                                 <th class="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
-                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Complaint</th>
                                 <th class="text-left py-3 px-4 font-semibold text-gray-700">Phone</th>
                                 <th class="text-left py-3 px-4 font-semibold text-gray-700">Mode</th>
                                 <th class="text-left py-3 px-4 font-semibold text-gray-700">Location</th>
@@ -177,7 +177,7 @@
             tbody.innerHTML = reports.map(report => `
                 <tr class="border-b border-gray-100 hover:bg-gray-50 ${report.status === 'acknowledged' ? 'bg-green-50/50' : ''}">
                     <td class="py-3 px-4 text-sm">${new Date(report.submitted_at).toLocaleString()}</td>
-                    <td class="py-3 px-4 text-sm">${report.name || 'Anonymous'}</td>
+                    <td class="py-3 px-4 text-sm">${report.complaint ? report.complaint.substring(0, 50) + '...' : 'No complaint'}</td>
                     <td class="py-3 px-4 text-sm">${report.phone || 'N/A'}</td>
                     <td class="py-3 px-4">
                         <span class="px-2 py-1 text-xs rounded-full ${getModeColor(report.mode)}">
@@ -221,37 +221,12 @@
                 <p class="mt-4"><strong>Media:</strong></p>
                 ${report.video_url ? `<video controls src="${report.video_url}" class="w-full max-h-64 mt-2"></video>` : ''}
                 ${report.audio_url ? `<audio controls src="${report.audio_url}" class="w-full mt-2"></audio>` : ''}
-                <button onclick="acknowledgeReport(${report.id})" class="mt-4 btn bg-green-500 text-white ${report.status === 'acknowledged' ? 'opacity-50 cursor-not-allowed' : ''}" ${report.status === 'acknowledged' ? 'disabled' : ''}>
-                    Acknowledge
-                </button>
             `;
 
             modal.classList.remove('hidden');
         }
         
-        async function acknowledgeReport(reportId) {
-            if (reports.find(r => r.id === reportId)?.status === 'acknowledged') return;
-            
-            const adminId = localStorage.getItem('adminLoggedIn') || 'admin_browser_user';
-            
-            try {
-                const response = await fetch(`/api/reports/${reportId}/acknowledge`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId: adminId }) 
-                });
 
-                if (response.ok) {
-                    // Server broadcasts update on success, which triggers WS refresh
-                    closeModal();
-                } else {
-                    alert('Failed to acknowledge report.');
-                }
-            } catch (error) {
-                console.error('Error acknowledging report:', error);
-                alert('Network error while acknowledging report.');
-            }
-        }
 
         function closeModal() {
             document.getElementById('reportModal').classList.add('hidden');
