@@ -215,41 +215,7 @@
             const modal = document.getElementById('reportModal');
             const details = document.getElementById('reportDetails');
 
-            details.innerHTML = `
-                <div class="space-y-4">
-                    <div><strong>Name:</strong> ${report.name || 'Anonymous'}</div>
-                    <div><strong>Phone:</strong> ${report.phone || 'N/A'}</div>
-                    <div><strong>Mode:</strong> ${report.mode}</div>
-                    <div><strong>Submitted:</strong> ${new Date(report.submittedAt).toLocaleString()}</div>
-                    <div><strong>Complaint:</strong><br><div class="bg-gray-50 p-3 rounded mt-2">${report.complaint || 'No description provided'}</div></div>
-                    ${report.location ? `
-                        <div><strong>Location:</strong><br>
-                            <div class="bg-gray-50 p-3 rounded mt-2">
-                                Lat: ${report.location.latitude}, Lng: ${report.location.longitude}<br>
-                                <a href="https://maps.google.com/?q=${report.location.latitude},${report.location.longitude}" target="_blank" class="text-blue-600 hover:underline">
-                                    <i class="fas fa-external-link-alt mr-1"></i>Open in Google Maps
-                                </a>
-                            </div>
-                        </div>
-                    ` : ''}
-                    ${report.files?.audio ? `
-                        <div><strong>Audio:</strong><br>
-                            <audio controls class="w-full mt-2">
-                                <source src="${report.files.audio}" type="audio/mpeg">
-                            </audio>
-                        </div>
-                    ` : ''}
-                    ${report.files?.video ? `
-                        <div><strong>Video:</strong><br>
-                            <video controls class="w-full mt-2 max-h-64">
-                                <source src="${report.files.video}" type="video/mp4">
-                            </video>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-
-            modal.classList.remove('hidden');
+           
         }
 
         function closeModal() {
