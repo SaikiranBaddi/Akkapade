@@ -1,197 +1,308 @@
-// server.js - Aka Padi Emergency Portal with PostgreSQL + Cloudinary + WebSockets
-import dotenv from "dotenv";
-dotenv.config();
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Emergency Reports</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+Kannada:wght@700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link rel="icon" href="The-Karnataka-Government-Kannada-Logo-Vector.svg-.png" type="image/x-icon">
+    <style>
+        body { 
+            font-family: 'Inter', 'Noto Sans Kannada', sans-serif; 
+            background: linear-gradient(135deg, #e0f2fe 0%, #bfdbfe 100%); 
+            min-height: 100vh;
+        }
+        .card { 
+            border-radius: 1.5rem; 
+            box-shadow: 0 10px 30px rgba(10, 40, 80, 0.1), 0 4px 10px rgba(10, 40, 80, 0.05);
+            border: 1px solid #f0f4f8; 
+            background: rgba(255, 255, 255, 0.98);
+        }
+        .btn { 
+            border-radius: 1rem; 
+            padding: 0.75rem 1rem; 
+            font-weight: 600; 
+            transition: transform 0.1s, box-shadow 0.2s; 
+            box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+        }
+        .btn:hover { 
+            transform: translateY(-2px); 
+            box-shadow: 0 6px 15px rgba(0,0,0,0.15); 
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col p-4">
 
-import express from "express";
-import http from "http"; // <-- ADDED: Required for WebSocket server
-import bodyParser from "body-parser";
-import multer from "multer";
-import cloudinary from "cloudinary";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import { fileURLToPath } from "url";
-import path from "path";
-import pkg from "pg";
-import { WebSocketServer } from "ws"; // <-- ADDED: WebSocket library
+        <nav class="w-full bg-white/30 backdrop-blur-sm rounded-2xl shadow-lg p-4 flex items-center justify-between mb-6">
+        <div class="flex items-center gap-4">
+            <img src="The-Karnataka-Government-Kannada-Logo-Vector.svg-.png" alt="Government of Karnataka" class="w-10 h-10 rounded bg-white p-1">
+            <div>
+                <div class="text-lg font-bold text-gray-800">ADMIN DASHBOARD</div>
+                <div class="text-xs text-gray-600">Emergency Reports Management</div>
+            </div>
+        </div>
+        <button onclick="logout()" class="btn bg-red-500 text-white text-sm">
+            <i class="fas fa-sign-out-alt mr-1"></i>
+            Logout
+        </button>
+    </nav>
 
-const { Pool } = pkg;
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div class="card p-6 text-center">
+            <i class="fas fa-exclamation-triangle text-red-500 text-3xl mb-2"></i>
+            <div class="text-2xl font-bold text-gray-800" id="totalReports">0</div>
+            <div class="text-sm text-gray-600">Total Reports</div>
+        </div>
+        <div class="card p-6 text-center">
+            <i class="fas fa-clock text-yellow-500 text-3xl mb-2"></i>
+            <div class="text-2xl font-bold text-gray-800" id="todayReports">0</div>
+            <div class="text-sm text-gray-600">Today's Reports</div>
+        </div>
+        <div class="card p-6 text-center">
+            <i class="fas fa-video text-blue-500 text-3xl mb-2"></i>
+            <div class="text-2xl font-bold text-gray-800" id="mediaReports">0</div>
+            <div class="text-sm text-gray-600">With Media</div>
+        </div>
+     </div>
 
-// ---------- PATH FIX & EXPRESS SETUP (Unchanged) ----------
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const app = express();
-const PORT = process.env.PORT || 5000;
+        <main class="flex-1">
+        <div class="card p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-gray-800">Emergency Reports</h2>
+                <button onclick="refreshReports()" class="btn bg-blue-500 text-white">
+                    <i class="fas fa-refresh mr-2"></i>
+                    Refresh
+                </button>
+            </div>
 
-// ---------- DATABASE & MIDDLEWARE SETUP (Unchanged) ----------
-const pool = new Pool({
- connectionString:
-  process.env.DATABASE_URL ||
-  "postgresql://akkapade_database_user:ccG6YPqEaxqwG3zCmfVIRLNnA69kfNMQ@dpg-d3jvrkbuibrs73dtp8p0-a/akkapade_database",
- ssl: { rejectUnauthorized: false },
-});
-pool
- .connect()
- .then(() => console.log("✅ Connected to PostgreSQL database"))
- .catch((err) => console.error("❌ Database connection failed:", err.message));
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
-app.use(express.static("public"));
+            <div id="loading" class="text-center py-8">
+                <i class="fas fa-spinner fa-spin text-2xl text-gray-400"></i>
+                <p class="text-gray-600 mt-2">Loading reports...</p>
+            </div>
 
-// ---------- CLOUDINARY SETUP (Unchanged) ----------
-cloudinary.v2.config({
- cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
- api_key: process.env.CLOUDINARY_API_KEY,
- api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-const storage = new CloudinaryStorage({
- cloudinary: cloudinary.v2,
- params: { folder: "Akka_pade_reports", resource_type: "auto" },
-});
-const upload = multer({ storage }).any();
+            <div id="reportsContainer" class="hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Time</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Name</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Phone</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Mode</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Location</th>
+                                <th class="text-left py-3 px-4 font-semibold text-gray-700">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="reportsTable">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
-// ---------- ROUTES (Unchanged) ----------
-app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
-app.get("/report.html", (req, res) => res.sendFile(path.join(__dirname, "public", "report.html")));
-app.get("/admin.html", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
-app.get("/admin-dashboard.html", (req, res) => res.sendFile(path.join(__dirname, "public", "admin-dashboard.html")));
+            <div id="noReports" class="text-center py-8 hidden">
+                <i class="fas fa-inbox text-4xl text-gray-300 mb-3"></i>
+                <p class="text-gray-600">No reports found</p>
+            </div>
+        </div>
+    </main>
 
-// ---------- HANDLE REPORT SUBMISSION (MODIFIED to broadcast update) ----------
-app.post("/api/submit", (req, res) => {
- upload(req, res, async (err) => {
-  if (err) {
-   console.error("❌ Multer upload error:", err);
-   return res.status(500).json({ success: false, error: "File upload failed" });
-  }
-  try {
-   const name = (req.body?.name ?? "").trim();
-   const complaint = req.body?.complaint ?? req.body?.text ?? "";
-   const findPhone = (obj) => {
-    const keys = ["phone", "phonenumber", "phoneNumber", "mobile", "tel", "contact"];
-    for (const k of keys) if (obj?.[k]) return obj[k];
-    return "";
-   };
-   const phone = findPhone(req.body)?.toString().trim() || "";
-   const { latitude, longitude, accuracy } = req.body;
-   const latNum = latitude ? Number(latitude) : null;
-   const lonNum = longitude ? Number(longitude) : null;
-   const accNum = accuracy ? Number(accuracy) : null;
-   let audioUrl = null;
-   let videoUrl = null;
-   if (req.files && Array.isArray(req.files)) {
-    for (const file of req.files) {
-     const mimeTypeLower = file.mimetype ? file.mimetype.toLowerCase() : '';
-     if (mimeTypeLower.startsWith("audio/")) {
-      audioUrl = file.path;
-     } else if (mimeTypeLower.startsWith("video/")) {
-      videoUrl = file.path;
-     }
-    }
-   }
-   const mode = videoUrl ? "video" : audioUrl ? "audio" : "form";
-   const insertQuery = `
-    INSERT INTO reports
-    (name, phone, complaint, latitude, longitude, accuracy, audio_url, video_url, mode, status, submitted_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW())
-    RETURNING id;
-   `;
-   const values = [name, phone, complaint, latNum, lonNum, accNum, audioUrl, videoUrl, mode];
-   const result = await pool.query(insertQuery, values);
-   const newId = result.rows[0].id;
-   console.log("📩 Report saved to DB:", { id: newId, name, phone, mode });
+        <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="card p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-800">Report Details</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="reportDetails"></div>
+        </div>
+    </div>
 
-   // --- BROADCAST UPDATE ON NEW SUBMISSION ---
-   broadcastUpdate();
+    <script>
+        // Check authentication
+        if (!localStorage.getItem('adminLoggedIn')) {
+            window.location.href = 'admin.html';
+        }
 
-   res.json({ success: true, message: "Report submitted successfully!", reportId: newId });
-  } catch (err) {
-   console.error("❌ Error saving report:", err);
-   res.status(500).json({ success: false, error: err.message });
-  }
- });
-});
+        let reports = [];
 
+        function logout() {
+            localStorage.removeItem('adminLoggedIn');
+            window.location.href = 'admin.html';
+        }
 
-// ---------- FETCH ALL REPORTS (Unchanged) ----------
-app.get("/api/reports", async (req, res) => {
- try {
-  const { rows } = await pool.query("SELECT * FROM reports ORDER BY submitted_at DESC");
-  res.json(rows);
- } catch (err) {
-  console.error("❌ Error fetching reports:", err);
-  res.status(500).json({ success: false, error: err.message });
- }
-});
+        async function loadReports() {
+            try {
+                const response = await fetch('/api/reports');
+                reports = await response.json();
+                updateStats();
+                renderReports();
+            } catch (error) {
+                console.error('Error loading reports:', error);
+            }
+        }
 
+        function updateStats() {
+            // Note: submittedAt from DB is snake_case, JS variable uses camelCase
+            const today = new Date().toDateString();
+            const todayReports = reports.filter(r => new Date(r.submitted_at).toDateString() === today);
+            const mediaReports = reports.filter(r => r.audio_url || r.video_url);
 
-// ---------- ACKNOWLEDGE ENDPOINT (MODIFIED to broadcast update) ==========
-app.post("/api/reports/:id/acknowledge", async (req, res) => {
- const { id } = req.params;
- const { userId } = req.body;
+            document.getElementById('totalReports').textContent = reports.length;
+            document.getElementById('todayReports').textContent = todayReports.length;
+            document.getElementById('mediaReports').textContent = mediaReports.length;
+        }
 
- if (!id || !userId) {
-  return res.status(400).json({ success: false, error: "Report ID and User ID are required." });
- }
+        function renderReports() {
+            const container = document.getElementById('reportsContainer');
+            const loading = document.getElementById('loading');
+            const noReports = document.getElementById('noReports');
+            const tbody = document.getElementById('reportsTable');
 
- try {
-  const updateQuery = `
-   UPDATE reports
-   SET status = 'acknowledged',
-    acknowledged_by_user_id = $2
-   WHERE id = $1
-   RETURNING id, status, acknowledged_by_user_id;
-  `;
-  const result = await pool.query(updateQuery, [id, userId]);
+            loading.classList.add('hidden');
 
-  if (result.rowCount === 0) {
-   return res.status(404).json({ success: false, error: `Report with ID ${id} not found.` });
-  }
+            if (reports.length === 0) {
+                noReports.classList.remove('hidden');
+                container.classList.add('hidden');
+                return;
+            }
 
-  console.log(`✅ Report ${id} status updated to 'acknowledged' by user ${userId}`);
+            noReports.classList.add('hidden');
+            container.classList.remove('hidden');
 
-  // --- THIS IS THE KEY FIX ---
-  // Broadcast the "refresh" message to all connected clients
-  broadcastUpdate();
+            tbody.innerHTML = reports.map(report => `
+                <tr class="border-b border-gray-100 hover:bg-gray-50 ${report.status === 'acknowledged' ? 'bg-green-50/50' : ''}">
+                    <td class="py-3 px-4 text-sm">${new Date(report.submitted_at).toLocaleString()}</td>
+                    <td class="py-3 px-4 text-sm">${report.name || 'Anonymous'}</td>
+                    <td class="py-3 px-4 text-sm">${report.phone || 'N/A'}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 text-xs rounded-full ${getModeColor(report.mode)}">
+                            ${report.mode}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4 text-sm">
+                        ${report.latitude && report.longitude ? 
+                            `<a href="https://maps.google.com/?q=${report.latitude},${report.longitude}" target="_blank" class="text-blue-600 hover:underline">
+                                <i class="fas fa-map-marker-alt mr-1"></i>View
+                            </a>` : 'N/A'}
+                    </td>
+                    <td class="py-3 px-4">
+                        <button onclick="viewReport(${report.id})" class="btn bg-blue-500 text-white text-xs">
+                            View Details
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
 
-  res.json({
-   success: true,
-   message: `Report ${id} has been acknowledged by user ${userId}.`,
-   report: result.rows[0],
-  });
+        function getModeColor(mode) {
+            switch(mode) {
+                case 'video': return 'bg-pink-100 text-pink-800';
+                case 'audio': return 'bg-teal-100 text-teal-800';
+                default: return 'bg-blue-100 text-blue-800';
+            }
+        }
 
- } catch (err) {
-  console.error(`❌ Error acknowledging report ${id}:`, err);
-  res.status(500).json({ success: false, error: "Failed to update report status." });
- }
-});
+        // Modified to use report.id for lookup
+        function viewReport(reportId) {
+            const report = reports.find(r => r.id === reportId);
+            if (!report) return;
 
+            const modal = document.getElementById('reportModal');
+            const details = document.getElementById('reportDetails');
 
-// ---------- SERVER & WEBSOCKET SETUP ----------
-// Create an HTTP server from the Express app
-const server = http.createServer(app);
+            // --- Content rendering logic goes here (simplified for this prompt) ---
+            details.innerHTML = `
+                <p><strong>Complaint:</strong> ${report.complaint}</p>
+                <p><strong>Submitted At:</strong> ${new Date(report.submitted_at).toLocaleString()}</p>
+                ${report.status === 'acknowledged' ? `<p class="mt-2 text-green-600"><strong>Acknowledged by:</strong> ${report.acknowledged_by_user_id}</p>` : ''}
+                <p class="mt-4"><strong>Media:</strong></p>
+                ${report.video_url ? `<video controls src="${report.video_url}" class="w-full max-h-64 mt-2"></video>` : ''}
+                ${report.audio_url ? `<audio controls src="${report.audio_url}" class="w-full mt-2"></audio>` : ''}
+                <button onclick="acknowledgeReport(${report.id})" class="mt-4 btn bg-green-500 text-white ${report.status === 'acknowledged' ? 'opacity-50 cursor-not-allowed' : ''}" ${report.status === 'acknowledged' ? 'disabled' : ''}>
+                    Acknowledge
+                </button>
+            `;
 
-// Create a WebSocket server that attaches to our HTTP server
-const wss = new WebSocketServer({ server });
+            modal.classList.remove('hidden');
+        }
+        
+        async function acknowledgeReport(reportId) {
+            if (reports.find(r => r.id === reportId)?.status === 'acknowledged') return;
+            
+            const adminId = localStorage.getItem('adminLoggedIn'); // Assumes admin ID is stored here
+            
+            try {
+                const response = await fetch(`/api/reports/${reportId}/acknowledge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: adminId || 'admin_browser_user' }) 
+                });
 
-wss.on('connection', ws => {
- console.log('🔗 New client connected via WebSocket');
- ws.on('close', () => {
-  console.log('🔌 Client disconnected');
- });
- ws.on('error', console.error);
-});
+                if (response.ok) {
+                    // The server will broadcast the update, which will trigger loadReports() via WebSocket
+                    closeModal();
+                } else {
+                    alert('Failed to acknowledge report.');
+                }
+            } catch (error) {
+                console.error('Error acknowledging report:', error);
+                alert('Network error while acknowledging report.');
+            }
+        }
 
-// Function to send a "refresh" message to every connected client
-function broadcastUpdate() {
- console.log(`📢 Broadcasting update to ${wss.clients.size} clients...`);
- const message = JSON.stringify({ type: 'REFRESH_REPORTS' });
- 
- wss.clients.forEach(client => {
-  if (client.readyState === client.OPEN) {
-   client.send(message);
-  }
- });
-}
+        function closeModal() {
+            document.getElementById('reportModal').classList.add('hidden');
+        }
 
-// Start the server
-server.listen(PORT, "0.0.0.0", () => {
- console.log(`✅ Aka Padi Emergency Portal running on port ${PORT}`);
-});
+        function refreshReports() {
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('reportsContainer').classList.add('hidden');
+            loadReports();
+        }
+        
+        // --- NEW: WEBSOCKET INTEGRATION FOR REAL-TIME REFRESH ---
+        const WEBSOCKET_URL = "ws://" + window.location.host; 
+
+        function connectWebSocket() {
+            const ws = new WebSocket(WEBSOCKET_URL);
+
+            ws.onopen = () => {
+                console.log("🔗 WebSocket Connected to server.");
+            };
+
+            ws.onmessage = (event) => {
+                console.log("📢 WS Message received:", event.data);
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'REFRESH_REPORTS') {
+                        console.log('🔄 Server requested report refresh. Auto-refreshing...');
+                        refreshReports(); // Triggers loading and rendering new data
+                    }
+                } catch (e) {
+                    console.error("Error parsing WS message:", e);
+                }
+            };
+
+            ws.onclose = (event) => {
+                console.log(`🔌 WebSocket Disconnected. Code: ${event.code}. Reconnecting in 5s...`);
+                // Attempt to reconnect after a delay
+                setTimeout(connectWebSocket, 5000);
+            };
+
+            ws.onerror = (error) => {
+                console.error("❌ WebSocket Error:", error);
+                ws.close(); // Force close to trigger onclose and reconnection logic
+            };
+        }
+
+        // Initialize
+        loadReports();
+        connectWebSocket(); // Start the WebSocket connection on load
+        
+        // Auto-refresh logic is now handled by WebSockets
+    </script>
+</body>
+</html>
