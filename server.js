@@ -214,22 +214,22 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 
     // Check if a report with that ID was actually found and updated
     if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, error: Report with ID ${id} not found. });
+      return res.status(404).json({ success: false, error: "Report with ID " + id + " not found." });
     }
 
-    console.log(✅ Report ${id} status updated to 'acknowledged' by user ${userId});
+    console.log("✅ Report " + id + " status updated to 'acknowledged' by user " + userId);
 
     // Broadcast to all connected WebSocket clients to refresh their reports
     broadcast("REFRESH_REPORTS");
 
     res.json({
       success: true,
-      message: Report ${id} has been acknowledged by user ${userId}.,
+      message: "Report " + id + " has been acknowledged by user " + userId + ".",
       report: result.rows[0],
     });
 
   } catch (err) {
-    console.error(❌ Error acknowledging report ${id}:, err);
+    console.error("❌ Error acknowledging report " + id + ":", err);
     res.status(500).json({ success: false, error: "Failed to update report status." });
   }
 });
@@ -237,7 +237,7 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 
 // ---------- START SERVER (Updated to handle WebSocket upgrade) ----------
 const server = app.listen(PORT, "0.0.0.0", () => {
-  console.log(✅ Aka Padi Emergency Portal running on port ${PORT});
+  console.log("✅ Aka Padi Emergency Portal running on port " + PORT);
 });
 
 // Handle WebSocket upgrade
