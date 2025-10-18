@@ -3,10 +3,10 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-// 🌟 NEW: Import http and Socket.IO for real-time functionality
+// 🌟 NEEDED LIBRARY IMPORTS 🌟
 import { createServer } from "http";
 import { Server as SocketIOServer } from "socket.io"; 
-// -----------------------------------------------------------
+// ----------------------------
 
 import bodyParser from "body-parser";
 import multer from "multer";
@@ -27,24 +27,22 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 🌟 NEW: Create an HTTP server and wrap it with Socket.IO
+// 🌟 Socket.IO Initialization
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, {
     cors: {
-        // Allows connection from any origin (adjust for production)
         origin: "*", 
         methods: ["GET", "POST"]
     }
 });
 
-// 🌟 NEW: Handle Socket.IO connection (Optional, for logging)
 io.on('connection', (socket) => {
     console.log('🔗 A user connected via Socket.IO');
     socket.on('disconnect', () => {
         console.log('💔 A user disconnected from Socket.IO');
     });
 });
-// -----------------------------------------------------------
+// ---------------------------------------------
 
 // ---------- DATABASE SETUP ----------
 const pool = new Pool({
@@ -59,10 +57,11 @@ pool
     .then(() => console.log("✅ Connected to PostgreSQL database"))
     .catch((err) => console.error("❌ Database connection failed:", err.message));
 
-// ---------- MIDDLEWARE AND CLOUDINARY SETUP (Unchanged) ----------
+// ---------- MIDDLEWARE AND CLOUDINARY SETUP ----------
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-// Serve the Socket.IO client library from a route (optional if using CDN)
+// Serve the Socket.IO client library from a route
+// NOTE: You might need to adjust the path or use a CDN in production.
 app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socket.io-client', 'dist')));
 app.use(express.static("public"));
 
@@ -81,11 +80,11 @@ const storage = new CloudinaryStorage({
 const upload = multer({ storage }).any();
 
 
-// ---------- ROUTES (Unchanged)----------
+// ---------- ROUTES ----------
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 app.get("/report.html", (req, res) => res.sendFile(path.join(__dirname, "public", "report.html")));
 
-// ---------- HANDLE REPORT SUBMISSION (Unchanged logic) ----------
+// ---------- HANDLE REPORT SUBMISSION ----------
 app.post("/api/submit", (req, res) => {
     upload(req, res, async (err) => {
         if (err) {
@@ -120,26 +119,23 @@ app.post("/api/submit", (req, res) => {
             }
             const mode = videoUrl ? "video" : audioUrl ? "audio" : "form";
 
-            // --- INSERT QUERY (status default is 'pending') ---
             const insertQuery = `
                 INSERT INTO reports
                 (name, phone, complaint, latitude, longitude, accuracy, audio_url, video_url, mode, status, submitted_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW())
-                RETURNING id;
+                RETURNING id, name, phone, mode, status, submitted_at;
             `;
 
             const values = [name, phone, complaint, latNum, lonNum, accNum, audioUrl, videoUrl, mode];
             const result = await pool.query(insertQuery, values);
-            const newId = result.rows[0].id;
+            const newReportData = result.rows[0];
             
-            // 🌟 NEW: Broadcast a notification for a new report submitted
-            // This is optional but useful for immediate dashboard notification
-            const newReportData = { id: newId, name, phone, mode, status: 'pending', submitted_at: new Date() };
+            // 🌟 Socket.IO: Broadcast a notification for a new report submitted
             io.emit('newReportSubmitted', newReportData); 
-            console.log(`📡 Broadcasted new report ID: ${newId}`);
+            console.log(`📡 Broadcasted new report ID: ${newReportData.id}`);
 
-            console.log("📩 Report saved to DB:", { id: newId, name, phone, mode });
-            res.json({ success: true, message: "Report submitted successfully!", reportId: newId });
+            console.log("📩 Report saved to DB:", { id: newReportData.id, name, phone, mode });
+            res.json({ success: true, message: "Report submitted successfully!", reportId: newReportData.id });
         } catch (err) {
             console.error("❌ Error saving report:", err);
             res.status(500).json({ success: false, error: err.message });
@@ -148,10 +144,9 @@ app.post("/api/submit", (req, res) => {
 });
 
 
-// ---------- FETCH ALL REPORTS (Unchanged) ----------
+// ---------- FETCH ALL REPORTS ----------
 app.get("/api/reports", async (req, res) => {
     try {
-        // Select the new column as well
         const { rows } = await pool.query("SELECT * FROM reports ORDER BY submitted_at DESC");
         res.json(rows);
     } catch (err) {
@@ -161,7 +156,7 @@ app.get("/api/reports", async (req, res) => {
 });
 
 
-// ========== MODIFIED ACKNOWLEDGE ENDPOINT (Includes userId and Socket.IO broadcast) ==========
+// ========== ACKNOWLEDGE ENDPOINT (FIXED: Type conversion and Socket.IO broadcast) ==========
 
 app.post("/api/reports/:id/acknowledge", async (req, res) => {
     const { id } = req.params;
@@ -175,6 +170,14 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
         return res.status(400).json({ success: false, error: "Acknowledging User ID is required in the request body (userId)." });
     }
 
+    // 🌟 FIX: Convert userId to an integer to prevent "invalid input syntax" error
+    const acknowledgingUserId = parseInt(userId);
+
+    if (isNaN(acknowledgingUserId)) {
+         return res.status(400).json({ success: false, error: "Acknowledging User ID must be a valid number." });
+    }
+    // -------------------------------------------------------------------
+
     try {
         const updateQuery = `
             UPDATE reports
@@ -184,7 +187,8 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
             RETURNING id, status, acknowledged_by_user_id;
         `;
 
-        const result = await pool.query(updateQuery, [id, userId]);
+        // Use the converted integer value for $2
+        const result = await pool.query(updateQuery, [id, acknowledgingUserId]);
 
         if (result.rowCount === 0) {
             return res.status(404).json({ success: false, error: `Report with ID ${id} not found.` });
@@ -192,16 +196,15 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 
         const updatedReport = result.rows[0];
 
-        // 🌟 NEW: BROADCAST THE CHANGE TO ALL CONNECTED CLIENTS
-        // This is the key for instant updates on other devices/dashboards
+        // 🌟 Socket.IO: BROADCAST THE CHANGE FOR INSTANT UPDATE
         io.emit('reportAcknowledged', updatedReport);
-        console.log(`📡 Broadcasted acknowledgement for report ${id} by user ${userId}`);
+        console.log(`📡 Broadcasted acknowledgement for report ${id} by user ${acknowledgingUserId}`);
 
-        console.log(`✅ Report ${id} status updated to 'acknowledged' by user ${userId}`);
+        console.log(`✅ Report ${id} status updated to 'acknowledged' by user ${acknowledgingUserId}`);
 
         res.json({
             success: true,
-            message: `Report ${id} has been acknowledged by user ${userId}.`,
+            message: `Report ${id} has been acknowledged by user ${acknowledgingUserId}.`,
             report: updatedReport,
         });
 
@@ -212,7 +215,7 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 });
 
 
-// ---------- START SERVER (Using httpServer instead of app) ----------
+// ---------- START SERVER (Using httpServer to include Socket.IO) ----------
 httpServer.listen(PORT, "0.0.0.0", () => {
     console.log(`✅ Aka Padi Emergency Portal running on port ${PORT}`);
     console.log(`✅ Socket.IO running on port ${PORT}`);
