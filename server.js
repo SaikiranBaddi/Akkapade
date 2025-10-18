@@ -135,7 +135,7 @@ INSERT INTO reports
 (name, phone, complaint, latitude, longitude, accuracy, audio_url, video_url, mode, status, submitted_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending', NOW())
 RETURNING id;
-`; // <-- CORRECTED: No leading space before "INSERT"
+`; // <-- Syntax error fix applied here (removed leading spaces before INSERT)
     const values = [name, phone, complaint, latNum, lonNum, accNum, audioUrl, videoUrl, mode];
     const result = await pool.query(insertQuery, values);
     const newId = result.rows[0].id;
@@ -153,10 +153,16 @@ RETURNING id;
 });
 
 
-// ---------- FETCH ALL REPORTS (Unchanged) ----------
+// ---------- FETCH ALL REPORTS (MODIFIED for immediate update) ----------
 app.get("/api/reports", async (req, res) => {
   try {
-    const { rows } = await pool.query("SELECT * FROM reports WHERE (status = 'acknowledged') OR (status = 'pending' AND submitted_at <= NOW() - INTERVAL '5 minute') ORDER BY submitted_at DESC");
+    // FIX: Removed the 5-minute interval restriction for pending reports.
+    // Now, all 'pending' and 'acknowledged' reports are fetched immediately.
+    const { rows } = await pool.query(`
+      SELECT * FROM reports 
+      WHERE status = 'acknowledged' OR status = 'pending' 
+      ORDER BY submitted_at DESC
+    `);
     res.json(rows);
   } catch (err) {
     console.error("❌ Error fetching reports:", err);
@@ -190,7 +196,6 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 
     console.log(`✅ Report ${id} status updated to 'acknowledged' by user ${userId}`);
 
-    // --- THIS IS THE KEY FIX ---
     // Broadcast the "refresh" message to all connected clients
     broadcastUpdate();
 
