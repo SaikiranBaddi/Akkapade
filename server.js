@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import express from "express";
-import http from "http"; // <-- ADDED: Required for WebSocket server
+import http from "http"; // Required for WebSocket server
 import bodyParser from "body-parser";
 import multer from "multer";
 import cloudinary from "cloudinary";
@@ -11,29 +11,30 @@ import { CloudinaryStorage } from "multer-storage-cloudinary";
 import { fileURLToPath } from "url";
 import path from "path";
 import pkg from "pg";
-import { WebSocketServer } from "ws"; // <-- ADDED: WebSocket library
+import { WebSocketServer } from "ws"; // WebSocket library
 
 const { Pool } = pkg;
 
-// ---------- PATH FIX & EXPRESS SETUP (Unchanged) ----------
+// ---------- PATH FIX & EXPRESS SETUP ----------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ---------- DATABASE & MIDDLEWARE SETUP (MODIFIED: Added Reports Table Init) ----------
+// ---------- DATABASE & MIDDLEWARE SETUP ----------
 const pool = new Pool({
  connectionString:
   process.env.DATABASE_URL ||
-  "postgresql://akkapade_database_user:ccG6YPqEaxqwG3zCmfVIRLNnA69kfNMQ@dpg-d3jvrkbuibrs73dtp8p0-a/akkapade_database",
- ssl: { rejectUnauthorized: false },
+  // REVERTED URL: Using a common local database URL
+  "postgresql://user:password@localhost:5432/mydatabase", 
+ ssl: { rejectUnauthorized: false }, // Useful for hosted services like Heroku
 });
 pool
  .connect()
  .then(async () => {
   console.log("✅ Connected to PostgreSQL database");
  
-  // Initialize the 'reports' table for the dashboard to fetch data
+  // Initialize the 'reports' table
   try {
    await pool.query(`
     CREATE TABLE IF NOT EXISTS reports (
@@ -58,11 +59,12 @@ pool
   }
  })
  .catch((err) => console.error("❌ Database connection failed:", err.message));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// ---------- CLOUDINARY SETUP (Unchanged) ----------
+// ---------- CLOUDINARY SETUP ----------
 cloudinary.v2.config({
  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
  api_key: process.env.CLOUDINARY_API_KEY,
@@ -80,7 +82,7 @@ app.get("/report.html", (req, res) => res.sendFile(path.join(__dirname, "public"
 app.get("/admin.html", (req, res) => res.sendFile(path.join(__dirname, "public", "admin.html")));
 app.get("/admin-dashboard.html", (req, res) => res.sendFile(path.join(__dirname, "public", "admin-dashboard.html")));
 
-// ---------- USER STATUS ENDPOINTS ----------
+// ---------- USER STATUS ENDPOINTS (Placeholder) ----------
 app.post("/api/user-status", async (req, res) => {
   try {
     res.json({ success: true });
@@ -141,7 +143,7 @@ app.post("/api/submit", (req, res) => {
    const newId = result.rows[0].id;
    console.log("📩 Report saved to DB:", { id: newId, name, phone, mode });
 
-   // --- BROADCAST UPDATE ON NEW SUBMISSION ---
+   // BROADCAST: Signal new report to all connected clients
    broadcastUpdate();
 
    res.json({ success: true, message: "Report submitted successfully!", reportId: newId });
@@ -153,10 +155,10 @@ app.post("/api/submit", (req, res) => {
 });
 
 
-// ---------- FETCH ALL REPORTS (Unchanged) ----------
+// ---------- FETCH ALL REPORTS ----------
 app.get("/api/reports", async (req, res) => {
  try {
-  // Selects acknowledged reports AND pending reports older than 5 minutes, ordered by time.
+  // Fetches acknowledged reports OR pending reports older than 5 minutes
   const { rows } = await pool.query("SELECT * FROM reports WHERE (status = 'acknowledged') OR (status = 'pending' AND submitted_at <= NOW() - INTERVAL '5 minutes') ORDER BY submitted_at DESC");
   res.json(rows);
  } catch (err) {
@@ -166,7 +168,7 @@ app.get("/api/reports", async (req, res) => {
 });
 
 
-// ---------- ACKNOWLEDGE ENDPOINT (FIXED: Cleaned SQL Query) ==========
+// ---------- ACKNOWLEDGE ENDPOINT (Fixed) ----------
 app.post("/api/reports/:id/acknowledge", async (req, res) => {
   const { id } = req.params;
   const { userId } = req.body;
@@ -176,7 +178,6 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
   }
 
   try {
-    // **FIX**: The SQL query string was meticulously re-typed to ensure no hidden whitespace characters.
     const updateQuery = `
       UPDATE reports
       SET status = 'acknowledged',
@@ -193,7 +194,7 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 
     console.log(`✅ Report ${id} status updated to 'acknowledged' by user ${userId}`);
 
-    // Broadcast the "refresh" message to all connected clients
+    // BROADCAST: Signal report status change to all connected clients
     broadcastUpdate();
 
     res.json({
@@ -203,14 +204,13 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
     });
 
   } catch (err) {
-    // The previous error was caught here.
     console.error(`❌ Error acknowledging report ${id}:`, err);
     res.status(500).json({ success: false, error: "Failed to update report status." });
   }
 });
 
 
-// ---------- SERVER & WEBSOCKET SETUP (Unchanged) ----------
+// ---------- SERVER & WEBSOCKET SETUP ----------
 // Create an HTTP server from the Express app
 const server = http.createServer(app);
 
