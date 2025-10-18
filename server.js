@@ -11,12 +11,13 @@ import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
 import pkg from "pg";
+import { WebSocketServer } from "ws";
 
 const { Pool } = pkg;
 
 // ---------- PATH FIX FOR ES MODULE ----------
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _dirname = path.dirname(_filename);
 
 // ---------- EXPRESS SETUP ----------
 const app = express();
@@ -53,6 +54,31 @@ pool
   .connect()
   .then(() => console.log("✅ Connected to PostgreSQL database"))
   .catch((err) => console.error("❌ Database connection failed:", err.message));
+
+// ---------- WEBSOCKET SETUP FOR REAL-TIME UPDATES ----------
+const wss = new WebSocketServer({ noServer: true });
+
+wss.on("connection", (ws) => {
+  console.log("🔌 New WebSocket client connected");
+  
+  ws.on("message", (message) => {
+    console.log("📨 Received from client:", message.toString());
+    // Echo or broadcast messages from clients if needed
+  });
+
+  ws.on("close", () => {
+    console.log("🔌 WebSocket client disconnected");
+  });
+});
+
+// Broadcast helper function
+function broadcast(message) {
+  wss.clients.forEach((client) => {
+    if (client.readyState === 1) { // 1 = OPEN
+      client.send(message);
+    }
+  });
+}
 
 // ---------- MIDDLEWARE AND CLOUDINARY SETUP (Unchanged) ----------
 app.use(bodyParser.json());
@@ -125,6 +151,10 @@ app.post("/api/submit", (req, res) => {
       const result = await pool.query(insertQuery, values);
       const newId = result.rows[0].id;
       console.log("📩 Report saved to DB:", { id: newId, name, phone, mode });
+      
+      // Broadcast to all connected clients that a new report was added
+      broadcast("REFRESH_REPORTS");
+      
       res.json({ success: true, message: "Report submitted successfully!", reportId: newId });
     } catch (err) {
       console.error("❌ Error saving report:", err);
@@ -147,20 +177,27 @@ app.get("/api/reports", async (req, res) => {
 });
 
 
-// ========== MODIFIED ACKNOWLEDGE ENDPOINT (Includes userId) ==========
+// ========== MODIFIED ACKNOWLEDGE ENDPOINT (Fixed to handle integer userId properly) ==========
 
 app.post("/api/reports/:id/acknowledge", async (req, res) => {
   const { id } = req.params; // Get the report ID from the URL (e.g., /api/reports/123/acknowledge)
-  // Assuming the user ID is passed in the request body from the client/admin panel
-  const { userId } = req.body; 
-
+  
+  // Accept both userId (camelCase) and user_id (snake_case) from client
+  const userIdRaw = req.body.userId ?? req.body.user_id;
+  
   if (!id) {
     return res.status(400).json({ success: false, error: "Report ID is required." });
   }
   
-  // This check is important for the new functionality
-  if (!userId) {
-    return res.status(400).json({ success: false, error: "Acknowledging User ID is required in the request body (userId)." });
+  // Convert to integer and validate
+  const userId = Number(userIdRaw);
+  
+  if (!Number.isInteger(userId) || userId === 0) {
+    console.error("❌ Invalid userId received:", { body: req.body, userIdRaw, userId });
+    return res.status(400).json({ 
+      success: false, 
+      error: "Acknowledging User ID must be a valid non-zero integer. Received: " + JSON.stringify(req.body)
+    });
   }
 
   try {
@@ -177,25 +214,35 @@ app.post("/api/reports/:id/acknowledge", async (req, res) => {
 
     // Check if a report with that ID was actually found and updated
     if (result.rowCount === 0) {
-      return res.status(404).json({ success: false, error: `Report with ID ${id} not found.` });
+      return res.status(404).json({ success: false, error: Report with ID ${id} not found. });
     }
 
-    console.log(`✅ Report ${id} status updated to 'acknowledged' by user ${userId}`);
+    console.log(✅ Report ${id} status updated to 'acknowledged' by user ${userId});
+
+    // Broadcast to all connected WebSocket clients to refresh their reports
+    broadcast("REFRESH_REPORTS");
 
     res.json({
       success: true,
-      message: `Report ${id} has been acknowledged by user ${userId}.`,
+      message: Report ${id} has been acknowledged by user ${userId}.,
       report: result.rows[0],
     });
 
   } catch (err) {
-    console.error(`❌ Error acknowledging report ${id}:`, err);
+    console.error(❌ Error acknowledging report ${id}:, err);
     res.status(500).json({ success: false, error: "Failed to update report status." });
   }
 });
 
 
-// ---------- START SERVER (Unchanged) ----------
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ Aka Padi Emergency Portal running on port ${PORT}`);
+// ---------- START SERVER (Updated to handle WebSocket upgrade) ----------
+const server = app.listen(PORT, "0.0.0.0", () => {
+  console.log(✅ Aka Padi Emergency Portal running on port ${PORT});
+});
+
+// Handle WebSocket upgrade
+server.on("upgrade", (request, socket, head) => {
+  wss.handleUpgrade(request, socket, head, (ws) => {
+    wss.emit("connection", ws, request);
+  });
 });
